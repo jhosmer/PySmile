@@ -7,7 +7,7 @@ Based on https://github.com/brianm/libsmile
 
 ### Install:
 
-    python setup.py clean build test
+    python setup.py clean build test && python setup.py install
 
 
 ### Example Usage:
