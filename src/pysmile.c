@@ -15,6 +15,7 @@ static struct module_state _state;
 
 #define BUFFER_SIZE 65536
 
+/*
 static PyObject * pysmile_encode(PyObject *self, PyObject *args) {
     PyObject *jsonModule = PyImport_Import(PyBytes_FromString("json"));
     PyObject *encodeFunc = PyObject_GetAttrString(jsonModule, "dumps");
@@ -30,6 +31,7 @@ PyDoc_STRVAR(pysmile_encode__doc__,
              "\n"
              " - parameters - \n"
              "obj - The object to be encoded.\n");
+*/
 
 static PyObject * pysmile_decode(PyObject *self, PyObject *args) {
     char * str;
@@ -62,7 +64,7 @@ PyDoc_STRVAR(pysmile_decode__doc__,
 
 static PyMethodDef pysmileMethods[] = {
     {"decode",  (PyCFunction)pysmile_decode,    METH_VARARGS,   pysmile_decode__doc__},
-    {"encode",  (PyCFunction)pysmile_encode,    METH_VARARGS,   pysmile_encode__doc__},
+    // {"encode",  (PyCFunction)pysmile_encode,    METH_VARARGS,   pysmile_encode__doc__},
     {NULL,      NULL,                           0,              NULL},
 };
 
