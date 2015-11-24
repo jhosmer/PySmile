@@ -1,6 +1,11 @@
 # PySmile
 
-`python setup.py clean build test`
+Decode SMILE format objects
+
+
+### Install:
+
+    python setup.py clean build test
 
 
 ### Example Usage:
