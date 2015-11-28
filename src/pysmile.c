@@ -33,7 +33,7 @@ PyDoc_STRVAR(pysmile_encode__doc__,
              "obj - The object to be encoded.\n");
 */
 
-static PyObject * pysmile_decode(PyObject *self, PyObject *args) {
+static PyObject * pysmile_decode(PyObject *args) {
     char * str;
     int str_len;
     if (!PyArg_ParseTuple(args, "s#", &str, &str_len))
@@ -41,7 +41,7 @@ static PyObject * pysmile_decode(PyObject *self, PyObject *args) {
     char dst[BUFFER_SIZE] = {'\0'};
     PyObject *result;
     smile_decode_block_reset();
-    ssize_t bytes_decoded = smile_decode_block(dst, BUFFER_SIZE, str, str_len);
+    size_t bytes_decoded = (size_t)smile_decode_block(dst, BUFFER_SIZE, str, str_len);
     if (PyObject_IsInstance(args, (PyObject *)&PyUnicode_Type)) {
         // Convert to wide characters
         wchar_t bytes_out[BUFFER_SIZE] = {'\0'};

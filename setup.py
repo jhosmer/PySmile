@@ -2,10 +2,10 @@
 from setuptools import setup, Extension
 
 ext = Extension('pysmile',
-                ['src/pysmile.c', 'src/libsmile/block.c', 'src/libsmile/decode.c'],
+                ['src/pysmile.c', 'src/libsmile/lib/block.c', 'src/libsmile/lib/decode.c'],
                 extra_compile_args=['-std=c99', '-pedantic', '-Wall', '-O2',
                                     '-fomit-frame-pointer', '-Wno-tautological-compare',
-                                    '-Isrc/libsmile/', '-Isrc/libsmile/include'])
+                                    '-Isrc/libsmile/include'])
 
 setup(name='pysmile',
       author='Jonathan Hosmer',
