@@ -6,12 +6,12 @@ set(CMAKE_C_FLAGS_DEBUG       "${CMAKE_C_FLAGG_DEBUG} -g -DDEBUG=1")
 set(CMAKE_CXX_FLAGS_DEBUG     "${CMAKE_CXX_FLAGG_DEBUG} -g -DDEBUG=1")
 
 set(SOURCE_FILES
-    src/libsmile/lib/block.c
-    src/libsmile/lib/decode.c)
+    pysmile/libsmile/lib/block.c
+    pysmile/libsmile/lib/decode.c)
 
-include_directories(src/libsmile/include)
+include_directories(pysmile/libsmile/include)
 
-add_library(smile STATIC ${SOURCE_FILES} src/libsmile/lib/encode.h src/libsmile/lib/encode.c)
+add_library(smile STATIC ${SOURCE_FILES} pysmile/libsmile/lib/encode.h pysmile/libsmile/lib/encode.c)
 
 
 project(pysmile)
@@ -29,23 +29,22 @@ set(LIB_FILES
     python2.7)
 
 set(SOURCE_FILES
-    src/pysmile.c)
+    pysmile/pysmile.c)
 
-include_directories(/opt/local/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7 src/libsmile/include)
+include_directories(/opt/local/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7 pysmile/libsmile/include)
 
 add_library(pysmile MODULE ${SOURCE_FILES})
 target_link_libraries(pysmile ${LIB_FILES})
 set_target_properties(pysmile PROPERTIES PREFIX "")
 
 
-
 project(unsmile)
 
 set(SOURCE_FILES
-    src/libsmile/tools/usage.c
-    src/libsmile/tools/unsmile.c)
+    pysmile/libsmile/tools/usage.c
+    pysmile/libsmile/tools/unsmile.c)
 
-include_directories(src/libsmile/tools)
+include_directories(pysmile/libsmile/tools)
 add_executable(unsmile ${SOURCE_FILES})
 target_link_libraries(unsmile smile)
 

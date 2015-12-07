@@ -1,11 +1,20 @@
 #!/usr/bin/env python
 from setuptools import setup, Extension
 
-ext = Extension('pysmile',
-                ['src/pysmile.c', 'src/libsmile/lib/block.c', 'src/libsmile/lib/decode.c'],
-                extra_compile_args=['-std=c99', '-pedantic', '-Wall', '-O2',
-                                    '-fomit-frame-pointer', '-Wno-tautological-compare',
-                                    '-Isrc/libsmile/include'])
+c_sources = [
+    'pysmile/_pysmile.c',
+    'pysmile/libsmile/lib/block.c',
+    'pysmile/libsmile/lib/decode.c'
+]
+extra_compile_args = [
+    '-std=c99',
+    '-pedantic',
+    '-Wall',
+    '-O2',
+    '-fomit-frame-pointer',
+    '-Wno-tautological-compare',
+    '-Ipysmile/libsmile/include'
+]
 
 setup(name='pysmile',
       author='Jonathan Hosmer',
@@ -14,6 +23,7 @@ setup(name='pysmile',
       license='Apache License, Version 2.0',
       keywords='json smile',
       url='https://github.com/jhosmer/PySmile',
+      packages=['pysmile'],
       platforms=['Linux'],
       long_description='README',
       classifiers=[
@@ -24,4 +34,5 @@ setup(name='pysmile',
       ],
       test_suite='test.pysmile_test',
       version='0.1',
-      ext_modules=[ext])
+      # ext_modules=[Extension('_pysmile', c_sources, extra_compile_args=extra_compile_args)]
+)
