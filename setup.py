@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 from setuptools import setup
 
+
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
 setup(name='pysmile',
       author='Jonathan Hosmer',
       author_email='jon@pythonforios.com',
@@ -8,15 +12,14 @@ setup(name='pysmile',
       license='Apache License, Version 2.0',
       keywords='json smile',
       url='https://github.com/jhosmer/PySmile',
-      packages=['pysmile'],
+      packages=['pysmile', 'test'],
       platforms=['Linux'],
-      long_description='README',
+      long_description=read('README'),
       classifiers=[
-          'Development Status :: 3 - Alpha',
+          'Development Status :: 4 - Beta',
           'Environment :: Console',
           'Intended Audience :: Developers',
           'Topic :: Utilities',
       ],
       test_suite='test.pysmile_test',
-      version='0.1'
-)
+      version='0.1')
