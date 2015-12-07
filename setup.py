@@ -1,20 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup, Extension
-
-c_sources = [
-    'pysmile/_pysmile.c',
-    'pysmile/libsmile/lib/block.c',
-    'pysmile/libsmile/lib/decode.c'
-]
-extra_compile_args = [
-    '-std=c99',
-    '-pedantic',
-    '-Wall',
-    '-O2',
-    '-fomit-frame-pointer',
-    '-Wno-tautological-compare',
-    '-Ipysmile/libsmile/include'
-]
+from setuptools import setup
 
 setup(name='pysmile',
       author='Jonathan Hosmer',
@@ -33,6 +18,5 @@ setup(name='pysmile',
           'Topic :: Utilities',
       ],
       test_suite='test.pysmile_test',
-      version='0.1',
-      # ext_modules=[Extension('_pysmile', c_sources, extra_compile_args=extra_compile_args)]
+      version='0.1'
 )

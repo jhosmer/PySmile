@@ -1,6 +1,6 @@
 # PySmile
 
-Decode SMILE format objects
+Encode/Decode SMILE format objects
 
 Based on https://github.com/brianm/libsmile
 

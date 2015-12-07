@@ -1,2 +1,2 @@
 :)
-ú…widgetú„debugAon…windowú„titleYSample Konfabulator WidgetƒnameJmain_window„width$¨…height$¨û„imageú‚srcMImages/Sun.pngDCsun1†hOffset$´†vOffset$´ˆalignmentEcenterûƒtextúƒdataIClick Hereƒsize$ˆ„styleCboldDDtext1I$´J$ˆKˆonMouseUphsun1.opacity = (sun1.opacity / 100) * 90;ûûû
+ú…widgetú„debugAonƒtextú†vOffset$ˆ„styleCboldƒnameDtext1†hOffset$´ˆonMouseUphsun1.opacity = (sun1.opacity / 100) * 90;ƒdataIClick HereˆalignmentEcenterƒsize$ˆû…windowú„width$¨…height$¨EJmain_window„titleYSample Konfabulator Widgetû„imageúC$´‚srcMImages/Sun.pngIECsun1F$´ûûû
