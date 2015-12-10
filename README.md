@@ -1,26 +1,32 @@
-# PySmile
+## PySmile
 
 Encode/Decode SMILE format objects
 
 Based on https://github.com/brianm/libsmile
 
 
-### Install:
+## Install:
 
-    python setup.py clean build test && python setup.py install
+```bash
+python setup.py clean build test && python setup.py install
+```
+or from pypi (https://pypi.python.org/pypi/pysmile/0.1):
+```bash
+pip install pysmile
+```
 
+## Example Usage:
 
-### Example Usage:
+```python
+>>> import pysmile
+>>> o = {'a': 1, 'b': [2, 3, 4], 'c': {'d': {'e': 4.20}}}
+>>> b = pysmile.encodes(o)
+>>> print repr(b)
+':)\n\x03\xfa\x80a\xc2\x80c\xfa\x80d\xfa\x80e(fL\x19\x04\x04\xfb\xfb\x80b\xf8\xc4\xc6\xc8\xf9\xfb'
 
-    >>> import pysmile
-    >>> d = open('test/data/smile/test1.smile', 'rb').read()
-    >>> print repr(d)
-    ':)\n\x03\xfa\x87test key#\x88nullField!\x82foo\xc2\x83foo2\xfa\x80a\xc6\xfb\xc2a\xc3\xa3b$\n\x85\x802\xf8\xc2\xc4\xc6\xf9\x84"foo"Ffoo\nbar\xfb'
-    >>> print pysmile.decode(d)
-    {u'"foo"': u'foo\nbar',
-     u'2': [1, 2, 3],
-     u'a\xe3b': -323,
-     u'foo': 1,
-     u'foo2': {u'a': 3},
-     u'nullField': None,
-     u'test key': True}
+>>> d = pysmile.decodes(b)
+>>> print d
+{u'a': 1, u'b': [2, 3, 4], u'c': {u'd': {u'e': 4.2}}}
+
+>>> assert d == o
+```
