@@ -2,7 +2,14 @@
 
 Encode/Decode SMILE format objects
 
-Based on https://github.com/brianm/libsmile
+Based on:
+
+http://wiki.fasterxml.com/SmileFormat
+
+and
+
+https://github.com/brianm/libsmile
+
 
 
 ## Install:
