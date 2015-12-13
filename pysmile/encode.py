@@ -1,6 +1,7 @@
 """
 SMILE Generator
 """
+import re
 import sys
 import struct
 import decimal
@@ -26,19 +27,8 @@ def _utf_8_encode(s):
         return s
 
 
-class JsonGenerationException(StandardError):
+class SMILEEncodeError(StandardError):
     pass
-
-
-class Feature(object):
-    """Enumeration that defines all togglable features for Smile generators."""
-    def __init__(self, write_header=True, write_end_marker=False, encode_as_7bit=True,
-                 shared_names=True, shared_strings=True):
-        self.WRITE_HEADER = write_header
-        self.WRITE_END_MARKER = write_end_marker
-        self.ENCODE_BINARY_AS_7BIT = encode_as_7bit
-        self.CHECK_SHARED_NAMES = shared_names
-        self.CHECK_SHARED_STRING_VALUES = shared_strings
 
 
 class SharedStringNode(object):
@@ -64,41 +54,35 @@ class SmileGenerator(object):
     64-character Strings.
     """
 
-    def __init__(self, smile_features=None):
-        # ** Output buffering **
-        # Intermediate buffer in which contents are buffered before
-        # being written using {@link #_out}.
+    def __init__(self, shared_keys=True, shared_values=True, encode_as_7bit=True):
+        """
+        SmileGenerator Initializer
+
+        :param bool encode_as_7bit: (optional - Default: `True`) Encode raw data as 7-bit
+        :param bool shared_keys: (optional - Default: `True`) Shared Key String References
+        :param bool shared_values: (optional - Default: `True`) Shared Value String References
+        """
+        # Encoded data
         self.output = bytearray()
 
-        # Let's keep track of how many bytes have been output, may prove useful
-        # when debugging. This does <b>not</b> include bytes buffered in
-        # the output buffer, just bytes that have been written using underlying
-        # stream writer.
-        self.bytes_written = 0
+        # Shared Key Strings
+        self.shared_keys = []
 
-        # ** Shared String detection **
-        # Raw data structure used for checking whether field name to
-        # write can be output using back reference or not.
-        self.seen_names = []
+        # Shared Value Strings
+        self.shared_values = []
 
-        # Raw data structure used for checking whether String value to
-        # write can be output using back reference or not.
-        self.seen_strings = []
-
-        if smile_features is None:
-            self.format_features = Feature()
-        else:
-            self.format_features = smile_features
-
-        if self.format_features.CHECK_SHARED_NAMES:
-            self.seen_name_count = 0
-        else:
-            self.seen_name_count = -1
-
-        if self.format_features.CHECK_SHARED_STRING_VALUES:
-            self.seen_string_count = 0
-        else:
-            self.seen_string_count = -1
+        self.share_keys = bool(shared_keys)
+        self.share_values = bool(shared_values)
+        self.encode_as_7bit = bool(encode_as_7bit)
+        # if shared_keys:
+        #     self.seen_name_count = 0
+        # else:
+        #     self.seen_name_count = -1
+        #
+        # if shared_values:
+        #     self.seen_string_count = 0
+        # else:
+        #     self.seen_string_count = -1
 
     def write_header(self):
         """
@@ -109,13 +93,17 @@ class SmileGenerator(object):
         As a result usually only {@link SmileFactory} calls this method.
         """
         last = HEADER_BYTE_4
-        if self.format_features.CHECK_SHARED_NAMES:
+        if self.share_keys:
             last |= HEADER_BIT_HAS_SHARED_NAMES
-        if self.format_features.CHECK_SHARED_STRING_VALUES:
+        if self.share_values:
             last |= HEADER_BIT_HAS_SHARED_STRING_VALUES
-        if not self.format_features.ENCODE_BINARY_AS_7BIT:
+        if not self.encode_as_7bit:
             last |= HEADER_BIT_HAS_RAW_BINARY
         self.write_bytes(HEADER_BYTE_1, HEADER_BYTE_2, HEADER_BYTE_3, int(last))
+
+    def write_end_marker(self):
+        """Write optional end marker (BYTE_MARKER_END_OF_CONTENT - 0xFF)"""
+        self.write_byte(BYTE_MARKER_END_OF_CONTENT)
 
     def write_field_name(self, name):
         """
@@ -127,7 +115,7 @@ class SmileGenerator(object):
             return self.write_byte(TOKEN_KEY_EMPTY_STRING)
 
         # First: is it something we can share?
-        if self.format_features.CHECK_SHARED_NAMES:
+        if self.share_keys:
             ix = self._find_seen_name(name)
             if ix >= 0:
                 return self.write_shared_name_reference(ix)
@@ -147,14 +135,14 @@ class SmileGenerator(object):
                 self.write_bytes(type_token, utf_8_name)
             else:
                 self.write_bytes(TOKEN_KEY_LONG_STRING, utf_8_name, BYTE_MARKER_END_OF_STRING)
-            if self.format_features.CHECK_SHARED_NAMES:
+            if self.share_keys:
                 self._add_seen_name(utf_8_name)
         else:  # if isinstance(name, str):
             if str_len <= MAX_SHORT_NAME_ASCII_BYTES:
                 self.write_bytes(int(((TOKEN_PREFIX_KEY_ASCII - 1) + str_len)), name)
             else:
                 self.write_bytes(TOKEN_KEY_LONG_STRING, name, BYTE_MARKER_END_OF_STRING)
-            if self.format_features.CHECK_SHARED_NAMES:
+            if self.share_keys:
                 self._add_seen_name(name)
 
     def write_non_short_field_name(self, name):
@@ -169,7 +157,7 @@ class SmileGenerator(object):
         except UnicodeEncodeError:
             utf_8_name = name
         self.write_bytes(utf_8_name)
-        if self.format_features.CHECK_SHARED_NAMES:
+        if self.share_keys:
             self._add_seen_name(name)
         self.write_byte(BYTE_MARKER_END_OF_STRING)
 
@@ -198,7 +186,7 @@ class SmileGenerator(object):
             return self.write_non_shared_string(text)
 
         # Then: is it something we can share?
-        if self.format_features.CHECK_SHARED_STRING_VALUES:
+        if self.share_values:
             ix = self._find_seen_string_value(text)
             if ix >= 0:
                 return self.write_shared_string_value_reference(ix)
@@ -206,7 +194,7 @@ class SmileGenerator(object):
         if isinstance(text, unicode):
             utf_8_text = text.encode('utf-8')
             if len(utf_8_text) <= MAX_SHORT_VALUE_STRING_BYTES:
-                if self.format_features.CHECK_SHARED_STRING_VALUES:
+                if self.share_values:
                     self._add_seen_string_value(text)
                 if len(utf_8_text) == len(text):
                     self.write_byte(int((TOKEN_PREFIX_TINY_ASCII - 1) + len(utf_8_text)))
@@ -221,7 +209,7 @@ class SmileGenerator(object):
                 self.write_bytes(utf_8_text, BYTE_MARKER_END_OF_STRING)
         else:
             if len(text) <= MAX_SHORT_VALUE_STRING_BYTES:
-                if self.format_features.CHECK_SHARED_STRING_VALUES:
+                if self.share_values:
                     self._add_seen_string_value(text)
                 self.write_bytes(int((TOKEN_PREFIX_TINY_ASCII - 1) + len(text)), text)
             else:
@@ -249,10 +237,10 @@ class SmileGenerator(object):
 
         :param int ix: Index
         """
-        if ix >= len(self.seen_names)-1:
+        if ix >= len(self.shared_keys)-1:
             raise ValueError(
                 'Trying to write shared name with index {} but have only seen {}!'.format(
-                    ix, len(self.seen_names)))
+                    ix, len(self.shared_keys)))
         if ix < 64:
             self.write_byte(int((TOKEN_PREFIX_KEY_SHARED_SHORT + ix)))
         else:
@@ -264,15 +252,15 @@ class SmileGenerator(object):
 
         :param int ix: Index
         """
-        if ix > len(self.seen_strings)-1:
+        if ix > len(self.shared_values)-1:
             raise IllegalArgumentException(
                 'Internal error: trying to write shared String value with index {}; but have '
-                'only seen {} so far!'.format(ix, len(self.seen_strings)))
+                'only seen {} so far!'.format(ix, len(self.shared_values)))
         if ix < 31:
             #  add 1, as byte 0 is omitted
-            self.write_byte(int((TOKEN_PREFIX_SHARED_STRING_SHORT + 1 + ix)))
+            self.write_byte(TOKEN_PREFIX_SHARED_STRING_SHORT + 1 + ix)
         else:
-            self.write_bytes((int((TOKEN_PREFIX_SHARED_STRING_LONG + (ix >> 8)))), int(ix))
+            self.write_bytes(TOKEN_PREFIX_SHARED_STRING_LONG + (ix >> 8), int(ix))
 
     def write_non_shared_string(self, text):
         """
@@ -309,7 +297,7 @@ class SmileGenerator(object):
         """
         if data is None:
             return self.write_null()
-        if self.format_features.ENCODE_BINARY_AS_7BIT:
+        if self.encode_as_7bit:
             self.write_byte(TOKEN_MISC_BINARY_7BIT)
             self.write_7bit_binary(data)
         else:
@@ -431,7 +419,7 @@ class SmileGenerator(object):
             else:
                 self.write_decimal_number(i)
         elif isinstance(i, (float, decimal.Decimal)):
-            if isinstance(int(float(i)), long):
+            if isinstance(i, decimal.Decimal) and isinstance(int(float(i)), long):
                 self.write_byte(TOKEN_BYTE_BIG_DECIMAL)
                 scale = i.as_tuple().exponent
                 self.write_signed_vint(scale)
@@ -494,25 +482,25 @@ class SmileGenerator(object):
             return self.write_null()
         self.write_number(decimal.Decimal(num))
 
-    def write_byte(self, b):
+    def write_byte(self, c):
         """
         Write byte
 
-        :param b: byte
+        :param int|long|float|basestring c: byte
         """
-        if isinstance(b, basestring):
-            if isinstance(b, unicode):
-                b = b.encode('utf-8')
-            self.output.extend(b)
-        elif isinstance(b, (int, long)):
+        if isinstance(c, basestring):
+            if isinstance(c, unicode):
+                c = c.encode('utf-8')
+        elif isinstance(c, float):
+            c = str(c)
+        elif isinstance(c, (int, long)):
             try:
-                self.output.append(chr(b))
+                c = chr(c)
             except ValueError:
-                self.output.append(str(b))
-        elif isinstance(b, float):
-            self.output.append(str(b))
+                c = str(c)
         else:
-            print 'Unknown type for param "b": {} ({!r})'.format(type(b), b)
+            raise ValueError('Invalid type for param "c"!')
+        self.output.extend(c)
 
     def write_bytes(self, *args):
         """
@@ -626,7 +614,7 @@ class SmileGenerator(object):
     def _find_seen_name(self, name):
         n_hash = util.hash_string(name)
         try:
-            head = self.seen_names[n_hash & (len(self.seen_names)-1)]
+            head = self.shared_keys[n_hash & (len(self.shared_keys) - 1)]
         except IndexError:
             return -1
         if head is None:
@@ -647,34 +635,35 @@ class SmileGenerator(object):
             node = node.next
 
     def _add_seen_name(self, name):
-        if self.seen_name_count == len(self.seen_names):
-            if len(self.seen_names) == MAX_SHARED_NAMES:
-                self.seen_name_count = 0
-                self.seen_names = [None] * len(self.seen_names)
+        # if self.seen_name_count == len(self.shared_keys):
+        if self.shared_keys:
+            if len(self.shared_keys) == MAX_SHARED_NAMES:
+                # self.seen_name_count = 0
+                self.shared_keys = [None] * len(self.shared_keys)
             else:
-                old = copy.copy(self.seen_names)
-                self.seen_names = [None] * MAX_SHARED_NAMES
+                old = copy.copy(self.shared_keys)
+                self.shared_keys = [None] * MAX_SHARED_NAMES
                 mask = MAX_SHARED_NAMES - 1
                 for node in old:
                     while node:
                         ix = util.hash_string(node.value) & mask
                         next_node = node.next
                         try:
-                            node.next = self.seen_names[ix]
+                            node.next = self.shared_keys[ix]
                         except IndexError:
                             node.next = None
-                        self.seen_names[ix] = node
+                        self.shared_keys[ix] = node
                         node = next_node
-        ref = self.seen_name_count
-        if _is_valid_back_ref(ref):
-            ix = util.hash_string(name) & (len(self.seen_names)-1)
-            self.seen_names[ix] = SharedStringNode(name, ref, self.seen_names[ix])
-        self.seen_name_count = ref + 1
+            # ref = self.seen_name_count
+            if _is_valid_back_ref(len(self.shared_keys)):
+                ix = util.hash_string(name) & (len(self.shared_keys) - 1)
+                self.shared_keys[ix] = SharedStringNode(name, ref, self.shared_keys[ix])
+            # self.seen_name_count = ref + 1
 
     def _find_seen_string_value(self, text):
         hash_ = util.hash_string(text)
         try:
-            head = self.seen_strings[hash_ & (len(self.seen_strings)-1)]
+            head = self.shared_values[hash_ & (len(self.shared_values) - 1)]
         except IndexError:
             return -1
         if head is None:
@@ -691,29 +680,30 @@ class SmileGenerator(object):
             node = node.next
 
     def _add_seen_string_value(self, text):
-        if self.seen_string_count == len(self.seen_strings):
+        # if self.seen_string_count == len(self.shared_values):
+        if self.shared_values:
             if self.seen_string_count == MAX_SHARED_STRING_VALUES:
                 self.seen_string_count = 0
-                self.seen_strings = [None] * len(self.seen_strings)
+                self.shared_values = [None] * len(self.shared_values)
             else:
-                old = copy.copy(self.seen_strings)
-                self.seen_strings = [None] * MAX_SHARED_STRING_VALUES
+                old = copy.copy(self.shared_values)
+                self.shared_values = [None] * MAX_SHARED_STRING_VALUES
                 mask = MAX_SHARED_STRING_VALUES - 1
                 for node in old:
                     while node:
                         ix = util.hash_string(node.value) & mask
                         next_node = node.next
                         try:
-                            node.next = self.seen_strings[ix]
+                            node.next = self.shared_values[ix]
                         except IndexError:
                             node.next = None
-                        self.seen_strings[ix] = node
+                        self.shared_values[ix] = node
                         node = next_node
-        ref = self.seen_string_count
-        if _is_valid_back_ref(ref):
-            ix = util.hash_string(text) & (len(self.seen_strings) - 1)
-            self.seen_strings[ix] = SharedStringNode(text, ref, self.seen_strings[ix])
-        self.seen_string_count = ref + 1
+            # ref = self.seen_string_count
+            if _is_valid_back_ref(len(self.shared_values)):
+                ix = util.hash_string(text) & (len(self.shared_values) - 1)
+                self.shared_values[ix] = SharedStringNode(text, ref, self.shared_values[ix])
+            # self.seen_string_count = ref + 1
 
 
 def _is_valid_back_ref(index):
@@ -730,230 +720,100 @@ def _is_valid_back_ref(index):
     return (index & 0xFF) < 0xFE
 
 
-class SmileEncoder(json.JSONEncoder):
-    def encode(self, o):
-        """Return a JSON string representation of a Python data structure.
-
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
-        '{"foo": ["bar", "baz"]}'
-
-        """
-        # This is for extremely simple cases and benchmarks.
-        if isinstance(o, basestring):
-            if isinstance(o, str):
-                _encoding = self.encoding
-                if _encoding is not None and not (_encoding == 'utf-8'):
-                    o = o.decode(_encoding)
-            if self.ensure_ascii:
-                return json.encoder.encode_basestring_ascii(o)
-            else:
-                return json.encoder.encode_basestring(o)
-        # This doesn't pass the iterator directly to ''.join() because the
-        # exceptions aren't as detailed.  The list call should be roughly
-        # equivalent to the PySequence_Fast that ''.join() would do.
-        return str(self.iterencode(o, _one_shot=True))
-
-    def iterencode(self, o, _one_shot=False):
-        """Encode the given object and yield each string
-        representation as available.
-
-        For example::
-
-            for chunk in JSONEncoder().iterencode(bigobject):
-                mysocket.write(chunk)
-
-        """
-        if self.check_circular:
-            markers = {}
-        else:
-            markers = None
-        if self.ensure_ascii:
-            _encoder = json.encoder.encode_basestring_ascii
-        else:
-            _encoder = json.encoder.encode_basestring
-        if self.encoding != 'utf-8':
-            def _encoder(o, _orig_encoder=_encoder, _encoding=self.encoding):
-                if isinstance(o, str):
-                    o = o.decode(_encoding)
-                return _orig_encoder(o)
-
-        def floatstr(o, allow_nan=self.allow_nan, _repr=json.encoder.FLOAT_REPR,
-                     _inf=json.encoder.INFINITY, _neginf=-json.encoder.INFINITY):
-            # Check for specials.  Note that this type of test is processor
-            # and/or platform-specific, so do tests which don't depend on the
-            # internals.
-            if o != o:
-                text = 'NaN'
-            elif o == _inf:
-                text = 'Infinity'
-            elif o == _neginf:
-                text = '-Infinity'
-            else:
-                return _repr(o)
-            if not allow_nan:
-                raise ValueError('Out of range float values are not JSON compliant: ' + repr(o))
-            return text
-        _iterencode = _make_iterencode(
-                markers, self.default, _encoder, self.indent, floatstr, self.key_separator,
-                self.item_separator, self.sort_keys, self.skipkeys, _one_shot)
-        return _iterencode(o, 0)
-
-
-def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separator,
-                     _item_separator, _sort_keys, _skipkeys, _one_shot,
-                     ValueError=ValueError, basestring=basestring, dict=dict, float=float, id=id,
-                     int=int, isinstance=isinstance, list=list, long=long, str=str, tuple=tuple):
-
-    sg = SmileGenerator()
-
-    def _iterencode_list(lst, _current_indent_level):
-        sg.write_start_array()
-        if not lst:
-            sg.write_end_array()
-            return
-        markerid = None
-        if markers is not None:
-            markerid = id(lst)
-            if markerid in markers:
-                raise ValueError('Circular reference detected')
-            markers[markerid] = lst
-        for value in lst:
-            if isinstance(value, basestring):
-                sg.write_string(value)
-            elif value is None:
-                sg.write_null()
-            elif value is True:
-                sg.write_true()
-            elif value is False:
-                sg.write_false()
-            elif isinstance(value, (int, long, float)):
-                sg.write_number(value)
-            else:
-                if isinstance(value, (list, tuple)):
-                    _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    _iterencode_dict(value, _current_indent_level)
-                else:
-                    _iterencode(value, _current_indent_level)
-        sg.write_end_array()
-        if markers is not None:
-            del markers[markerid]
-
-    def _iterencode_dict(dct, _current_indent_level):
-        sg.write_start_object()
-        if not dct:
-            return sg.write_end_object()
-        markerid = None
-        if markers is not None:
-            markerid = id(dct)
-            if markerid in markers:
-                raise ValueError('Circular reference detected')
-            markers[markerid] = dct
-
-        for key, value in dct.iteritems():
-            if isinstance(key, basestring):
-                pass
-            # JavaScript is weakly typed for these, so it makes sense to
-            # also allow them.  Many encoders seem to do something like this.
-            elif isinstance(key, float):
-                key = _floatstr(key)
-            elif key is True:
-                key = 'true'
-            elif key is False:
-                key = 'false'
-            elif key is None:
-                key = 'null'
-            elif isinstance(key, (int, long)):
-                key = str(key)
-            elif _skipkeys:
-                continue
-            else:
-                raise TypeError('Key ' + repr(key) + ' is not a string')
-            sg.write_field_name(key)
-            if isinstance(value, basestring):
-                sg.write_string(value)  # _encoder(value)
-            elif value is None:
-                sg.write_null()
-            elif value is True:
-                sg.write_true()
-            elif value is False:
-                sg.write_false()
-            elif isinstance(value, (int, long)):
-                sg.write_number(value)
-            elif isinstance(value, float):
-                sg.write_number(_floatstr(value))
-            else:
-                if isinstance(value, (list, tuple)):
-                    _iterencode_list(value, _current_indent_level)
-                elif isinstance(value, dict):
-                    _iterencode_dict(value, _current_indent_level)
-                else:
-                    _iterencode(value, _current_indent_level)
-        sg.write_end_object()
-        if markers is not None:
-            del markers[markerid]
-
-    def _iterencode(o, _current_indent_level):
-        sg.write_header()
-        if isinstance(o, basestring):
-            sg.write_string(o)
-        elif o is None:
-            sg.write_null()
-        elif o is True:
-            sg.write_true()
-        elif o is False:
-            sg.write_false()
-        elif isinstance(o, (int, long, float)):
-            sg.write_number(str(o))
-        elif isinstance(o, (list, tuple)):
-            _iterencode_list(o, _current_indent_level)
-        elif isinstance(o, dict):
-            _iterencode_dict(o, _current_indent_level)
-        else:
-            markerid = None
-            if markers is not None:
-                markerid = id(o)
-                if markerid in markers:
-                    raise ValueError('Circular reference detected')
-                markers[markerid] = o
-            o = _default(o)
-            _iterencode(o, _current_indent_level)
-            if markers is not None:
-                del markers[markerid]
-        return sg.output
-    return _iterencode
-
-
-def encode(obj, fp):
+def encode(py_obj, header=True, ender=False, shared_keys=True, shared_vals=True, bin_7bit=True):
     """
-    Encode *obj* into SMILE format and write to *fp*
+    SMILE Encode object
 
-    :param list|dict obj: Object to be encoded
-    :param FileIO fp: File to write encoded data to
-    """
-    fp.write(encodes(obj))
-
-
-def encodes(obj):
-    """
-    Encode *obj* into SMILE format
-
-    :param list|dict obj: Object to be encoded
-    :returns: A string of data
+    :param list|dict py_obj: The object to be encoded
+    :param bool header: (optional - Default: `True`)
+    :param bool ender: (optional - Default: `False`)
+    :param bool bin_7bit: (optional - Default: `True`) Encode raw data as 7-bit
+    :param bool shared_keys: (optional - Default: `True`) Shared Key String References
+    :param bool shared_vals: (optional - Default: `True`) Shared Value String References
+    :returns: SMILE encoded data
     :rtype: str
     """
-    return SmileEncoder().encode(obj)
+    if isinstance(py_obj, (tuple, set)):
+        py_obj = list(py_obj)
+    elif not isinstance(py_obj, (list, dict)):
+        raise ValueError('Invalid type for "obj" paramater.  Must be list or tuple')
+
+    sg = SmileGenerator(shared_keys, shared_vals, bin_7bit)
+    if header:
+        sg.write_header()
+
+    def _floatstr(f):
+        """
+        Convert a Python float into a JSON float string
+
+        :param float f: Floating point number
+        :returns: JSON String representation of the float
+        :rtype: str
+        """
+        _inf = float('inf')
+        if f != f:
+            text = 'NaN'
+        elif f == _inf:
+            text = 'Infinity'
+        elif f == -_inf:
+            text = '-Infinity'
+        else:
+            return repr(f)
+        return text
+
+    def _iterencode(obj):
+        if isinstance(obj, basestring):
+            sg.write_string(obj)
+        elif obj is None:
+            sg.write_null()
+        elif obj is True:
+            sg.write_true()
+        elif obj is False:
+            sg.write_false()
+        elif isinstance(obj, float):
+            sg.write_number(obj)
+        elif isinstance(obj, (int, long)):
+            sg.write_number(obj)
+        elif isinstance(obj, (list, tuple, set)):
+            sg.write_start_array()
+            for v in list(obj):
+                _iterencode(v)
+            sg.write_end_array()
+        elif isinstance(obj, dict):
+            sg.write_start_object()
+            for key, val in obj.iteritems():
+                if key is True:
+                    key = 'true'
+                elif key is False:
+                    key = 'false'
+                elif key is None:
+                    key = 'null'
+                elif isinstance(key, (int, long)):
+                    key = str(key)
+                elif isinstance(key, float):
+                    key = _floatstr(key)
+                elif not isinstance(key, basestring):
+                    raise TypeError('Key ' + repr(key) + ' is not a string')
+                sg.write_field_name(key)
+                _iterencode(val)
+            sg.write_end_object()
+        else:
+            _iterencode(obj)
+    _iterencode(py_obj)
+    if ender:
+        sg.write_end_marker()
+    return str(sg.output)
 
 
 if __name__ == '__main__':
     a = ':)\n\x03\xfa\x80a@1\x80c\xf8\xc6\xf9\x80b\xc4\x80e(fL\x19\x04\x04\x80d\xc1\xfb'
-    b = encodes({'a': '1', 'b': 2, 'c': [3], 'd': -1, 'e': 4.20})
+    b = encode({'a': '1', 'b': 2, 'c': [3], 'd': -1, 'e': 4.20})
     if a != b:
         print repr(a)
         print repr(b)
 
     a = ':)\n\x03\xfa\x80a\xfa\x80b\xfa\x80c\xfa\x80d\xf8@e\xf9\xfb\xfb\xfb\xfb'
-    b = encodes({'a': {'b': {'c': {'d': ['e']}}}})
+    b = encode({'a': {'b': {'c': {'d': ['e']}}}})
     if a != b:
         print repr(a)
         print repr(b)

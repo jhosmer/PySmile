@@ -15,7 +15,7 @@ setup(
     license='Apache License, Version 2.0',
     keywords='json smile',
     url='https://github.com/jhosmer/PySmile',
-    packages=['pysmile', 'test'],
+    packages=['pysmile', 'tests'],
     platforms=['Linux'],
     long_description=read('README'),
     classifiers=[
@@ -29,6 +29,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: HTTP Servers',
         'Topic :: Utilities',
     ],
-    test_suite='test.pysmile_test',
+    test_suite='tests.pysmile_tests',
     version='0.1'
 )
