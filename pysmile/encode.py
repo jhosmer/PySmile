@@ -1,5 +1,6 @@
+#!/usr/bin/env python
 """
-SMILE Generator
+SMILE Encode
 """
 import re
 import sys
@@ -74,15 +75,6 @@ class SmileGenerator(object):
         self.share_keys = bool(shared_keys)
         self.share_values = bool(shared_values)
         self.encode_as_7bit = bool(encode_as_7bit)
-        # if shared_keys:
-        #     self.seen_name_count = 0
-        # else:
-        #     self.seen_name_count = -1
-        #
-        # if shared_values:
-        #     self.seen_string_count = 0
-        # else:
-        #     self.seen_string_count = -1
 
     def write_header(self):
         """
