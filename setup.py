@@ -12,6 +12,7 @@ setup(
     author='Jonathan Hosmer',
     author_email='jon@pythonforios.com',
     description='Tools for working with the SMILE data format',
+    download_url='https://pypi.python.org/pypi/pysmile',
     license='Apache License, Version 2.0',
     keywords='json smile',
     url='https://github.com/jhosmer/PySmile',
@@ -30,5 +31,5 @@ setup(
         'Topic :: Utilities',
     ],
     test_suite='tests.pysmile_tests',
-    version='0.1'
+    version='0.2'
 )
